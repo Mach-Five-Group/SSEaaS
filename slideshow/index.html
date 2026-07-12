@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SSEaaS Slideshow</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: #07111f;
+        color: #f5f7fa;
+        display: grid;
+        place-items: center;
+        padding: 2rem;
+        box-sizing: border-box;
+      }
+
+      .shell {
+        width: min(100%, 980px);
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 24px;
+        padding: 1.5rem;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+      }
+
+      .controls {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1rem;
+      }
+
+      button {
+        border: none;
+        border-radius: 999px;
+        padding: 0.75rem 1rem;
+        font-size: 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+        background: #2ea6ff;
+        color: #07111f;
+        transition: transform 0.2s ease, opacity 0.2s ease;
+      }
+
+      button:hover {
+        transform: translateY(-1px);
+      }
+
+      button:active {
+        transform: translateY(0);
+      }
+
+      .count {
+        font-size: 0.95rem;
+        color: #dce8f7;
+      }
+
+      .viewer {
+        display: grid;
+        place-items: center;
+        min-height: 70vh;
+        background: #444;
+        border-radius: 18px;
+        padding: 1rem;
+      }
+
+      .meta {
+        margin-top: 1rem;
+        text-align: center;
+      }
+
+      .meta h2 {
+        margin: 0 0 0.35rem;
+        font-size: 1.25rem;
+      }
+
+      .meta p {
+        margin: 0;
+        color: #dce8f7;
+        line-height: 1.5;
+      }
+
+      img {
+        max-width: 100%;
+        max-height: 70vh;
+        width: auto;
+        height: auto;
+        object-fit: contain;
+        border-radius: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <div class="controls">
+        <button id="prevBtn" type="button">← Previous</button>
+        <div class="count" id="count">Loading…</div>
+        <button id="nextBtn" type="button">Next →</button>
+      </div>
+
+      <div class="viewer">
+        <img id="slide" alt="Slideshow slide" />
+      </div>
+
+      <div class="meta">
+        <h2 id="slideTitle">Slide title</h2>
+        <p id="slideDesc">Add your description here.</p>
+      </div>
+    </main>
+
+    <script id="slide-meta" type="application/json">
+      [
+        {"title": "Slide 1", "desc": "Add your description here."},
+        {"title": "Slide 2", "desc": "Add your description here."},
+        {"title": "Slide 3", "desc": "Add your description here."},
+        {"title": "Slide 4", "desc": "Add your description here."},
+        {"title": "Slide 5", "desc": "Add your description here."},
+        {"title": "Slide 6", "desc": "Add your description here."},
+        {"title": "Slide 7", "desc": "Add your description here."},
+        {"title": "Slide 8", "desc": "Add your description here."}
+      ]
+    </script>
+
+    <script>
+      const slideCandidates = Array.from({ length: 8 }, (_, index) => `abbv_SSEaaS_${index + 1}.svg`);
+      const slideMetaEl = document.getElementById("slide-meta");
+      const slideEl = document.getElementById("slide");
+      const titleEl = document.getElementById("slideTitle");
+      const descEl = document.getElementById("slideDesc");
+      const countEl = document.getElementById("count");
+      const prevBtn = document.getElementById("prevBtn");
+      const nextBtn = document.getElementById("nextBtn");
+
+      let slides = [];
+      let currentIndex = 0;
+
+      function makeUrl(fileName) {
+        return new URL(fileName, window.location.href).href;
+      }
+
+      function updateCount() {
+        if (!slides.length) {
+          countEl.textContent = "No slides found";
+          return;
+        }
+
+        countEl.textContent = `${currentIndex + 1} / ${slides.length}`;
+      }
+
+      function updateMeta() {
+        const meta = slideMetaEl ? JSON.parse(slideMetaEl.textContent || "[]") : [];
+        const entry = Array.isArray(meta) ? meta[currentIndex] : null;
+        titleEl.textContent = entry?.title || "";
+        descEl.textContent = entry?.desc || "";
+      }
+
+      function showSlide(index) {
+        if (!slides.length) {
+          return;
+        }
+
+        currentIndex = (index + slides.length) % slides.length;
+        slideEl.src = makeUrl(slides[currentIndex]);
+        updateCount();
+        updateMeta();
+      }
+
+      function discoverSlides() {
+        const pending = [...slideCandidates];
+        const found = [];
+        let remaining = pending.length;
+
+        function finalize() {
+          slides = found.length ? found : [slideCandidates[0]];
+          showSlide(0);
+        }
+
+        if (!pending.length) {
+          finalize();
+          return;
+        }
+
+        pending.forEach((fileName) => {
+          const testImage = new Image();
+          testImage.onload = () => {
+            found.push(fileName);
+            remaining -= 1;
+            if (remaining === 0) {
+              finalize();
+            }
+          };
+          testImage.onerror = () => {
+            remaining -= 1;
+            if (remaining === 0) {
+              finalize();
+            }
+          };
+          testImage.src = makeUrl(fileName);
+        });
+      }
+
+      prevBtn.addEventListener("click", () => showSlide(currentIndex - 1));
+      nextBtn.addEventListener("click", () => showSlide(currentIndex + 1));
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "ArrowLeft") {
+          showSlide(currentIndex - 1);
+        } else if (event.key === "ArrowRight") {
+          showSlide(currentIndex + 1);
+        }
+      });
+
+      discoverSlides();
+    </script>
+  </body>
+</html>
