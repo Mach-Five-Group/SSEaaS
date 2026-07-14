@@ -1,2 +1,2 @@
 # SSEaaS
-SSE as a Service
+SSE as a Service!
